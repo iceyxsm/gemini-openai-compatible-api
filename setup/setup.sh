@@ -79,9 +79,19 @@ sudo mv $tmpfile $nginx_conf
 sudo ln -sf $nginx_conf /etc/nginx/sites-enabled/$DOMAIN
 sudo rm -f /etc/nginx/sites-enabled/default
 
-# 7. Obtain SSL cert with Certbot
-echo "Obtaining SSL certificate for $DOMAIN..."
-sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $LETSENCRYPT_EMAIL
+# 7. Obtain SSL cert before applying nginx config
+echo "Stopping nginx to issue SSL cert (standalone mode)..."
+sudo systemctl stop nginx
+
+echo "Requesting SSL cert for $DOMAIN..."
+sudo certbot certonly --standalone \
+  --non-interactive \
+  --agree-tos \
+  -m "$LETSENCRYPT_EMAIL" \
+  -d "$DOMAIN"
+
+sudo systemctl start nginx
+
 
 # 8. Create systemd service for backend
 sudo tee /etc/systemd/system/ggpt-backend.service > /dev/null <<EOL
