@@ -36,6 +36,7 @@ read -p "Enter rate limit per region (default: 60): " RATE_LIMIT_PER_REGION
 RATE_LIMIT_PER_REGION=${RATE_LIMIT_PER_REGION:-60}
 read -p "Enable search grounding? (true/false, default: true): " USE_SEARCH_GROUNDING
 USE_SEARCH_GROUNDING=${USE_SEARCH_GROUNDING:-true}
+read -p "Enter your email for Let's Encrypt (for SSL certificate renewal notices): " LETSENCRYPT_EMAIL
 
 # Wait for DNS propagation
 wait_for_dns "$DOMAIN"
@@ -80,7 +81,7 @@ sudo rm -f /etc/nginx/sites-enabled/default
 
 # 7. Obtain SSL cert with Certbot
 echo "Obtaining SSL certificate for $DOMAIN..."
-sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m admin@$DOMAIN
+sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $LETSENCRYPT_EMAIL
 
 # 8. Create systemd service for backend
 sudo tee /etc/systemd/system/ggpt-backend.service > /dev/null <<EOL
