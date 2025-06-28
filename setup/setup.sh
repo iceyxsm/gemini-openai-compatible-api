@@ -22,6 +22,7 @@ wait_for_dns() {
 }
 
 # 1. Prompt for all secrets
+echo $PUBLIC_IP
 read -p "Enter your domain or subdomain (e.g., api.example.com): " DOMAIN
 read -p "Enter your Supabase URL: " SUPABASE_URL
 read -p "Enter your Supabase Service Key: " SUPABASE_SERVICE_KEY
