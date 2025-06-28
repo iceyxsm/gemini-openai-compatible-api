@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+gunicorn
+supabase-py
+python-telegram-bot
+python-dotenv
+redis
+rq
+psutil 
