@@ -16,13 +16,15 @@ wait_for_dns() {
     else
       echo "Current DNS for $DOMAIN_TO_CHECK: $DOMAIN_IP (waiting for $PUBLIC_IP)"
       echo "Waiting 15 seconds before rechecking..."
+
       sleep 15
     fi
   done
 }
 
 # 1. Prompt for all secrets
-echo $PUBLIC_IP
+YOUR_IP=$(curl -s ifconfig.me)
+echo $YOUR_IP
 read -p "Enter your domain or subdomain (e.g., api.example.com): " DOMAIN
 read -p "Enter your Supabase URL: " SUPABASE_URL
 read -p "Enter your Supabase Service Key: " SUPABASE_SERVICE_KEY
