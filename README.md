@@ -53,12 +53,12 @@ This project is a production-ready, OpenAI-compatible API platform powered by Go
 **1. Clone the repository:**
 ```bash
 git clone https://github.com/iceyxsm/gemini-openai-compatible-api.git
-cd gemini-openai-compatible-api
+cd gemini-openai-compatible-api/setup/
 ```
 
 **2. Run the setup script:**
 ```bash
-./setup/setup.sh
+sudo bash setup.sh
 ```
 - Follow the prompts to enter your domain, Supabase keys, Telegram bot token, admin Telegram ID, and other info.
 - The script will install all dependencies, set up Nginx, SSL, Redis, systemd services, and make all scripts executable.
