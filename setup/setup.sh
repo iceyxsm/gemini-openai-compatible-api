@@ -1,6 +1,24 @@
 #!/bin/bash
 set -e
 
+# Function to wait for DNS propagation
+wait_for_dns() {
+  DOMAIN_TO_CHECK="$1"
+  echo "Checking if $DOMAIN_TO_CHECK points to this server's public IP..."
+  PUBLIC_IP=$(curl -s ifconfig.me)
+  while true; do
+    DOMAIN_IP=$(dig +short "$DOMAIN_TO_CHECK" | tail -n1)
+    if [ "$DOMAIN_IP" = "$PUBLIC_IP" ]; then
+      echo "Domain $DOMAIN_TO_CHECK is correctly pointed to $PUBLIC_IP."
+      break
+    else
+      echo "Current DNS for $DOMAIN_TO_CHECK: $DOMAIN_IP (waiting for $PUBLIC_IP)"
+      echo "Waiting 15 seconds before rechecking..."
+      sleep 15
+    fi
+  done
+}
+
 # 1. Prompt for all secrets
 read -p "Enter your domain or subdomain (e.g., api.example.com): " DOMAIN
 read -p "Enter your Supabase URL: " SUPABASE_URL
@@ -13,6 +31,9 @@ read -p "Enter rate limit per region (default: 60): " RATE_LIMIT_PER_REGION
 RATE_LIMIT_PER_REGION=${RATE_LIMIT_PER_REGION:-60}
 read -p "Enable search grounding? (true/false, default: true): " USE_SEARCH_GROUNDING
 USE_SEARCH_GROUNDING=${USE_SEARCH_GROUNDING:-true}
+
+# Wait for DNS propagation
+wait_for_dns "$DOMAIN"
 
 # 2. Write .env file
 envfile=".env"
