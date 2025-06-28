@@ -257,8 +257,9 @@ The admin Telegram bot is fully button-driven, but you can also use these comman
 | Admins                    | List all admins (only owner can add/remove) |
 | Add Admin                 | (Owner only) Add a new admin by Telegram ID |
 | Remove Admin              | (Owner only) Remove an admin |
+| Update Server              | (Owner only) Pull latest code, update dependencies, and restart all services (uses sudo) |
 
-**All actions are available via buttons in the bot's menu. Only the owner can manage admins.**
+**All actions are available via buttons in the bot's menu. Only the owner can manage admins and update the server.**
 
 ---
 

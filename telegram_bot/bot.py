@@ -27,6 +27,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("VPS Resources", callback_data="vps_resources")],
         [InlineKeyboardButton("Admins", callback_data="menu_admins")],
     ]
+    if user_id == SUPERADMIN_TELEGRAM_ID:
+        keyboard.append([InlineKeyboardButton("Update Server", callback_data="update_server")])
     await update.message.reply_text(
         "Welcome to the Gemini API Admin Panel. Choose an option:",
         reply_markup=InlineKeyboardMarkup(keyboard)
@@ -171,6 +173,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             msg = "<b>Registered Bots</b>\n" + "\n".join([f"{b['name']} ({b['status']})" for b in bots])
         await query.edit_message_text(msg, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="menu_bots")]]))
+    elif query.data == "update_server":
+        if user_id != SUPERADMIN_TELEGRAM_ID:
+            await query.edit_message_text("Only the owner can update the server.")
+            return
+        await query.edit_message_text("Updating server... This may take a minute.")
+        try:
+            # Pull latest code
+            subprocess.run(["git", "pull", "origin", "main"], check=True)
+            # Update dependencies
+            subprocess.run([".venv/bin/pip", "install", "-r", "requirements.txt"], check=True)
+            # Restart all services
+            subprocess.run(["sudo", "systemctl", "restart", "ggpt-backend"], check=True)
+            subprocess.run(["sudo", "systemctl", "restart", "ggpt-telegram-bot"], check=True)
+            subprocess.run(["sudo", "systemctl", "restart", "ggpt-rq-worker"], check=True)
+            await query.edit_message_text("✅ Server updated and all services restarted.")
+        except Exception as e:
+            await query.edit_message_text(f"❌ Update failed: {e}")
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)

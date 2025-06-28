@@ -6,6 +6,8 @@ wait_for_dns() {
   DOMAIN_TO_CHECK="$1"
   echo "Checking if $DOMAIN_TO_CHECK points to this server's public IP..."
   PUBLIC_IP=$(curl -s ifconfig.me)
+  echo "\nIMPORTANT: Please set an A record for $DOMAIN_TO_CHECK pointing to your server's external IP: $PUBLIC_IP"
+  echo "You can do this in your domain registrar's DNS settings."
   while true; do
     DOMAIN_IP=$(dig +short "$DOMAIN_TO_CHECK" | tail -n1)
     if [ "$DOMAIN_IP" = "$PUBLIC_IP" ]; then
