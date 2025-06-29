@@ -5,7 +5,7 @@ import uuid
 import datetime
 import os
 import requests
-from supabase_utils.supabase_client import is_valid_user_api_key, list_keys
+from supabase_client import is_valid_user_api_key, list_keys
 import redis
 from rq import Queue
 import time
