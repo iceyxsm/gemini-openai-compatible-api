@@ -65,6 +65,7 @@ if [ ! -d ".venv" ]; then
   python3 -m venv .venv
 fi
 source .venv/bin/activate
+export PYTHONPATH=$(pwd)
 pip install --upgrade pip
 pip install -r requirements.txt
 deactivate
