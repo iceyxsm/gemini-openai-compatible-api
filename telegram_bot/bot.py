@@ -1,12 +1,12 @@
 import os
 import psutil
 import subprocess
-import supabase
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler, MessageHandler, filters
 )
-from supabase.supabase_client import (
+from .supabase_.supabase_client import (
     list_keys, add_key, remove_key,
     create_user_api_key, list_user_api_keys, revoke_user_api_key,
     list_admins, add_admin, remove_admin, is_admin,
