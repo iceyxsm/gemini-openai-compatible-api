@@ -25,9 +25,34 @@ wait_for_dns() {
 # 1. Prompt for all secrets
 YOUR_IP=$(curl -s ifconfig.me)
 echo $YOUR_IP
+
+while true; do
+  read -p "Enter your Supabase URL: " SUPABASE_URL
+  read -p "Enter your Supabase Service Key: " SUPABASE_SERVICE_KEY
+  python3 - <<END
+import sys
+import requests
+url = "$SUPABASE_URL/rest/v1/"
+headers = {"apikey": "$SUPABASE_SERVICE_KEY", "Authorization": f"Bearer $SUPABASE_SERVICE_KEY"}
+try:
+    r = requests.get(url, headers=headers, timeout=10)
+    if r.status_code in (200, 401, 403):
+        sys.exit(0)
+    else:
+        print(f"Supabase responded with status {r.status_code}. Try again.")
+        sys.exit(1)
+except Exception as e:
+    print(f"Failed to connect: {e}")
+    sys.exit(1)
+END
+  if [ $? -eq 0 ]; then
+    break
+  else
+    echo "Invalid Supabase URL or Service Key. Please try again."
+  fi
+done
+
 read -p "Enter your domain or subdomain (e.g., api.example.com): " DOMAIN
-read -p "Enter your Supabase URL: " SUPABASE_URL
-read -p "Enter your Supabase Service Key: " SUPABASE_SERVICE_KEY
 read -p "Enter your Telegram Bot Token: " TELEGRAM_BOT_TOKEN
 read -p "Enter your Admin Telegram ID: " ADMIN_TELEGRAM_ID
 read -p "Enter default regions (comma-separated, default: us-central1,us-west4,europe-west3): " DEFAULT_REGIONS
