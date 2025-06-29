@@ -47,6 +47,7 @@ except Exception as e:
     sys.exit(1)
 END
   if [ $? -eq 0 ]; then
+    echo "Supabase credentials validated successfully!"
     break
   else
     echo "Invalid Supabase project ID or Service Key. Please try again."

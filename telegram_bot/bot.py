@@ -22,8 +22,9 @@ SUPERADMIN_TELEGRAM_ID = os.getenv("ADMIN_TELEGRAM_ID")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    if not is_admin(user_id):
-        await update.message.reply_text("Unauthorized.")
+    if not (is_admin(user_id) or user_id == str(SUPERADMIN_TELEGRAM_ID)):
+        first_name = update.effective_user.first_name
+        await update.message.reply_text(f"hi {first_name}\nid: {user_id}\nyou are not auth")
         return
     keyboard = [
         [InlineKeyboardButton("Gemini API Key Management", callback_data="menu_gemini")],
