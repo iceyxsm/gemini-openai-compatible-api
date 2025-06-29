@@ -27,7 +27,8 @@ YOUR_IP=$(curl -s ifconfig.me)
 echo $YOUR_IP
 
 while true; do
-  read -p "Enter your Supabase URL: " SUPABASE_URL
+  read -p "Enter your Supabase project ID (e.g., xdhpetpttwrddrfmgjhg): " SUPABASE_PROJECT_ID
+  SUPABASE_URL="https://$SUPABASE_PROJECT_ID.supabase.co"
   read -p "Enter your Supabase Service Key: " SUPABASE_SERVICE_KEY
   python3 - <<END
 import sys
@@ -48,7 +49,7 @@ END
   if [ $? -eq 0 ]; then
     break
   else
-    echo "Invalid Supabase URL or Service Key. Please try again."
+    echo "Invalid Supabase project ID or Service Key. Please try again."
   fi
 done
 
