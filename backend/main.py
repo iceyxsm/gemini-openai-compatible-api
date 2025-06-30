@@ -9,6 +9,7 @@ from supabase_client import is_valid_user_api_key, list_keys
 import redis
 from rq import Queue
 import time
+import logging
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_conn = redis.from_url(REDIS_URL)
@@ -59,11 +60,16 @@ def can_send_request(region):
 # Gemini request worker
 def gemini_worker(payload, region, api_key, model_name):
     url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={api_key}"
+    logging.warning(f"[DEBUG] Gemini API call: url={url}")
+    logging.warning(f"[DEBUG] Payload: {payload}")
+    logging.warning(f"[DEBUG] Model: {model_name}")
+    logging.warning(f"[DEBUG] API key: {api_key[:6]}{'*' * (len(api_key)-6)}")
     resp = requests.post(
         url,
         json=payload,
         timeout=30
     )
+    logging.warning(f"[DEBUG] Raw Gemini API response: {resp.text}")
     return resp.json(), resp.status_code
 
 @app.post("/v1/chat/completions")
@@ -104,6 +110,8 @@ async def chat_completions(request: Request, authorization: str = Header(None)):
     for key in gemini_keys:
         region = key["region"]
         model_name = key.get("model_name", "gemini-pro")
+        logging.warning(f"[DEBUG] Using model: {model_name} for region: {region}")
+        logging.warning(f"[DEBUG] Payload to Gemini: {gemini_payload}")
         if can_send_request(region):
             # Send immediately
             try:
