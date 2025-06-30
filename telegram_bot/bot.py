@@ -44,7 +44,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = str(query.from_user.id)
-    if not is_admin(user_id):
+    if not (is_admin(user_id) or user_id == str(SUPERADMIN_TELEGRAM_ID)):
         await query.edit_message_text("Unauthorized.")
         return
     # Main menu navigation
@@ -199,7 +199,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    if not is_admin(user_id):
+    if not (is_admin(user_id) or user_id == str(SUPERADMIN_TELEGRAM_ID)):
         return
     if context.user_data.get('add_gemini_key'):
         try:
