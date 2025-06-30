@@ -4,6 +4,7 @@ import psutil
 import subprocess
 import tempfile
 import requests
+import base64
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -294,7 +295,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         os.unlink(logf.name)
     elif query.data and query.data.startswith("select_gemini_model|"):
         try:
-            model_name = query.data.split("|", 1)[1]
+            encoded = query.data.split("|", 1)[1]
+            model_name = base64.urlsafe_b64decode(encoded).decode()
             api_key = context.user_data.get('pending_gemini_key')
             if not api_key:
                 await query.edit_message_text("No API key in progress. Please try again.")
@@ -307,6 +309,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await query.edit_message_text(f"Error: {e}")
         context.user_data.pop('pending_gemini_key', None)
+        context.user_data['add_gemini_key'] = False
         return
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -316,28 +319,36 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('add_gemini_key'):
         try:
             api_key = update.message.text.strip()
+            if api_key.lower() == '/cancel':
+                context.user_data['add_gemini_key'] = False
+                context.user_data.pop('pending_gemini_key', None)
+                await update.message.reply_text("❌ Gemini API key addition cancelled.")
+                return
             # List available models for this key
-            models_url = "https://generativelanguage.googleapis.com/v1beta/models"
+            models_url = "https://generativelanguage.googleapis.com/v1/models"
             test_params = {"key": api_key}
             resp = requests.get(models_url, params=test_params, timeout=10)
             if resp.status_code != 200:
-                await update.message.reply_text(f"❌ Invalid Gemini API key or quota exceeded. Status: {resp.status_code}\n{resp.text}")
-                context.user_data['add_gemini_key'] = False
+                await update.message.reply_text(f"❌ Invalid Gemini API key or quota exceeded. Status: {resp.status_code}\n{resp.text}\n\nPlease send a valid Gemini API key, or /cancel to stop.")
+                context.user_data['add_gemini_key'] = True
                 return
             models = resp.json().get("models", [])
             if not models:
-                await update.message.reply_text("❌ No models found for this API key.")
-                context.user_data['add_gemini_key'] = False
+                await update.message.reply_text("❌ No models found for this API key.\nPlease send a valid Gemini API key, or /cancel to stop.")
+                context.user_data['add_gemini_key'] = True
                 return
             context.user_data['pending_gemini_key'] = api_key
-            keyboard = [[InlineKeyboardButton(m['displayName'], callback_data=f"select_gemini_model|{m['name']}")] for m in models]
+            keyboard = [[InlineKeyboardButton(
+                m['displayName'],
+                callback_data=f"select_gemini_model|{base64.urlsafe_b64encode(m['name'].encode()).decode()}"
+            )] for m in models]
             await update.message.reply_text(
                 "Select a Gemini model for this API key:",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         except Exception as e:
-            await update.message.reply_text(f"Error: {e}\nJust send the API key.")
-        context.user_data['add_gemini_key'] = False
+            await update.message.reply_text(f"Error: {e}\nJust send the API key, or /cancel to stop.")
+            context.user_data['add_gemini_key'] = True
         return
     elif context.user_data.get('create_user_key'):
         try:
@@ -400,9 +411,15 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data['bot_creation'] = {}
             await start(update, context)
 
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.pop('add_gemini_key', None)
+    context.user_data.pop('pending_gemini_key', None)
+    await update.message.reply_text("❌ Gemini API key addition cancelled.")
+
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("cancel", cancel))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.run_polling() 
