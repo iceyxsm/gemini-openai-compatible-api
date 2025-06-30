@@ -332,20 +332,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"❌ Invalid Gemini API key or quota exceeded. Status: {resp.status_code}\n{resp.text}\n\nPlease send a valid Gemini API key, or /cancel to stop.")
                 context.user_data['add_gemini_key'] = True
                 return
-            models = resp.json().get("models", [])
-            if not models:
-                await update.message.reply_text("❌ No models found for this API key.\nPlease send a valid Gemini API key, or /cancel to stop.")
-                context.user_data['add_gemini_key'] = True
-                return
-            context.user_data['pending_gemini_key'] = api_key
-            keyboard = [[InlineKeyboardButton(
-                m['displayName'],
-                callback_data=f"select_gemini_model|{base64.urlsafe_b64encode(m['name'].encode()).decode()}"
-            )] for m in models]
-            await update.message.reply_text(
-                "Select a Gemini model for this API key:",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            await update.message.reply_text(f"Raw model data:\n{resp.text}")
+            context.user_data['add_gemini_key'] = False
+            return
         except Exception as e:
             await update.message.reply_text(f"Error: {e}\nJust send the API key, or /cancel to stop.")
             context.user_data['add_gemini_key'] = True
