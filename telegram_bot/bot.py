@@ -332,7 +332,18 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"❌ Invalid Gemini API key or quota exceeded. Status: {resp.status_code}\n{resp.text}\n\nPlease send a valid Gemini API key, or /cancel to stop.")
                 context.user_data['add_gemini_key'] = True
                 return
-            await update.message.reply_text(f"Raw model data:\n{resp.text}")
+            raw_json = resp.text
+            if len(raw_json) > 3500:
+                with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".json") as f:
+                    f.write(raw_json)
+                    temp_path = f.name
+                models = resp.json().get("models", [])
+                summary = "\n".join([m.get('displayName', m.get('name', '')) for m in models])
+                await update.message.reply_text(f"Model list is too long, sent as a file.\nSummary:\n{summary}")
+                await context.bot.send_document(chat_id=update.effective_chat.id, document=open(temp_path, "rb"), filename="gemini_models.json")
+                os.unlink(temp_path)
+            else:
+                await update.message.reply_text(f"Raw model data:\n{raw_json}")
             context.user_data['add_gemini_key'] = False
             return
         except Exception as e:
