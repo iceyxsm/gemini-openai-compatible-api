@@ -270,7 +270,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="update_log.txt")
                 os.unlink(logf.name)
                 # Show main menu automatically after successful update
-                await start(query, context, use_edit=True)
+                await start(update, context, use_edit=True)
                 return
             except Exception as e:
                 logf.write(str(e).encode())
@@ -279,7 +279,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="update_log.txt")
         os.unlink(logf.name)
         # Show main menu automatically
-        await start(query, context, use_edit=True)
+        await start(update, context, use_edit=True)
         return
     elif query.data == "force_update_and_restart":
         if user_id != SUPERADMIN_TELEGRAM_ID:
@@ -302,7 +302,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="force_update_log.txt")
         os.unlink(logf.name)
         # Show main menu automatically
-        await start(query, context, use_edit=True)
+        await start(update, context, use_edit=True)
         return
     elif query.data and query.data.startswith("select_gemini_model|"):
         idx = int(query.data.split("|", 1)[1])
@@ -340,7 +340,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop('pending_gemini_models', None)
         context.user_data['add_gemini_key'] = False
         # Show main menu automatically
-        await start(query, context, use_edit=True)
+        await start(update, context, use_edit=True)
         return
     if query.data == "back_gemini_model_select":
         models = context.user_data.get('pending_gemini_models', [])
