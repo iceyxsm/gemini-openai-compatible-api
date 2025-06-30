@@ -125,7 +125,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Gemini API Key flows
     elif query.data == "add_gemini_key":
         context.user_data['add_gemini_key'] = True
-        await query.edit_message_text("Send the new Gemini API key in the format: name,region,api_key")
+        await query.edit_message_text("Send the new Gemini API key:")
     elif query.data == "remove_gemini_key":
         keys = list_keys()
         if not keys:
@@ -203,11 +203,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if context.user_data.get('add_gemini_key'):
         try:
-            name, region, api_key = [x.strip() for x in update.message.text.split(",", 2)]
+            api_key = update.message.text.strip()
+            existing_keys = list_keys()
+            name = f"gemini_key{len(existing_keys) + 1}"
+            region = "global"
             add_key(name, region, api_key)
-            await update.message.reply_text("Gemini API key added.")
+            await update.message.reply_text(f"Gemini API key added as {name}.")
         except Exception as e:
-            await update.message.reply_text(f"Error: {e}\nFormat: name,region,api_key")
+            await update.message.reply_text(f"Error: {e}\nJust send the API key.")
         context.user_data['add_gemini_key'] = False
         await start(update, context)
     elif context.user_data.get('create_user_key'):
