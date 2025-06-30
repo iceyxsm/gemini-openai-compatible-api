@@ -33,24 +33,37 @@ while true; do
   python3 - <<END
 import sys
 import requests
-url = "$SUPABASE_URL/rest/v1/"
-headers = {"apikey": "$SUPABASE_SERVICE_KEY", "Authorization": f"Bearer $SUPABASE_SERVICE_KEY"}
+import uuid
+url = "$SUPABASE_URL/rest/v1/users"
+headers = {
+    "apikey": "$SUPABASE_SERVICE_KEY",
+    "Authorization": f"Bearer $SUPABASE_SERVICE_KEY",
+    "Content-Type": "application/json"
+}
+dummy_id = str(uuid.uuid4())
+payload = {"telegram_id": -99999999, "is_admin": False, "id": dummy_id}
 try:
-    r = requests.get(url, headers=headers, timeout=10)
-    if r.status_code in (200, 401, 403):
-        sys.exit(0)
-    else:
-        print(f"Supabase responded with status {r.status_code}. Try again.")
+    # Insert dummy row
+    r = requests.post(url, headers=headers, json=payload, timeout=10)
+    if r.status_code not in (201, 200):
+        print(f"Insert failed: {r.status_code} {r.text}")
         sys.exit(1)
+    # Delete dummy row
+    del_url = f"{url}?id=eq.{dummy_id}"
+    r = requests.delete(del_url, headers=headers, timeout=10)
+    if r.status_code not in (204, 200):
+        print(f"Delete failed: {r.status_code} {r.text}")
+        sys.exit(1)
+    sys.exit(0)
 except Exception as e:
-    print(f"Failed to connect: {e}")
+    print(f"Failed to connect or operate: {e}")
     sys.exit(1)
 END
   if [ $? -eq 0 ]; then
     echo "Supabase credentials validated successfully!"
     break
   else
-    echo "Invalid Supabase project ID or Service Key. Please try again."
+    echo "Invalid Supabase project ID or Service Key, or schema/permissions error. Please try again."
   fi
 done
 
