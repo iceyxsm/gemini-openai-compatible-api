@@ -184,12 +184,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not keys:
             await query.edit_message_text("No Gemini API keys found.")
             return
-        msg = "Gemini API Keys:\n" + "\n".join([f"{k['name']} ({k['region']}) - {'Active' if k['active'] else 'Inactive'}" for k in keys])
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="menu_gemini")]]))
+        msg = "Gemini API Keys:\n" + "\n".join([
+            f"{k['name']} ({k['region']}, {k.get('model_name', '?')}) - {'Active' if k['active'] else 'Inactive'}" for k in keys
+        ])
+        keyboard = []
+        for k in keys:
+            label = f"{k['name']} ({k['region']}, {k.get('model_name', '?')})"
+            revoke_btn = InlineKeyboardButton("Revoke", callback_data=f"del_gemini_{k['id']}")
+            keyboard.append([revoke_btn, InlineKeyboardButton(label, callback_data="noop")])
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="menu_gemini")])
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
     elif query.data.startswith("del_gemini_"):
         key_id = query.data[len("del_gemini_"):]
         remove_key(key_id)
-        await query.edit_message_text("Gemini key removed.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="menu_gemini")]]))
+        await query.edit_message_text("Gemini key revoked.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="list_gemini_keys")]]))
     elif query.data == "create_user_key":
         context.user_data['create_user_key'] = True
         await query.edit_message_text("Send a label for the new user API key (e.g. customer name or email):")
@@ -206,12 +214,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not keys:
             await query.edit_message_text("No user API keys found.")
             return
-        msg = "User API Keys:\n" + "\n".join([f"{k['user_label']} ({k['key'][:6]}...) - {'Active' if k['active'] else 'Revoked'}" for k in keys])
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="menu_user")]]))
+        msg = "User API Keys:\n" + "\n".join([
+            f"{k['user_label']} ({k['key'][:6]}...) - {'Active' if k['active'] else 'Revoked'}" for k in keys
+        ])
+        keyboard = []
+        for k in keys:
+            label = f"{k['user_label']} ({k['key'][:6]}...)"
+            revoke_btn = InlineKeyboardButton("Revoke", callback_data=f"del_user_{k['id']}")
+            status = '✅' if k['active'] else '❌'
+            keyboard.append([revoke_btn, InlineKeyboardButton(f"{label} {status}", callback_data="noop")])
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="menu_user")])
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
     elif query.data.startswith("del_user_"):
         key_id = query.data[len("del_user_"):]
         revoke_user_api_key(key_id)
-        await query.edit_message_text("User API key revoked.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="menu_user")]]))
+        await query.edit_message_text("User API key revoked.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="list_user_keys")]]))
     elif query.data == "create_bot":
         context.user_data['create_bot'] = True
         context.user_data['bot_creation'] = {}
@@ -404,7 +421,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_label = update.message.text.strip()
             api_key = create_user_api_key(user_label)
             if api_key:
-                await update.message.reply_text(f"User API key created for '{user_label}':\n{api_key}")
+                msg = f"User API key created for '<b>{user_label}</b>':\n<code>{api_key}</code>\n\nTap the button below to copy again."
+                keyboard = [[InlineKeyboardButton("Copy", callback_data=f"copy_user_api_key|{api_key}")]]
+                await update.message.reply_text(msg, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
             else:
                 await update.message.reply_text("Failed to create user API key.")
         except Exception as e:
@@ -459,6 +478,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data['create_bot'] = False
             context.user_data['bot_creation'] = {}
             await start(update, context)
+
+    # Handler for Copy button
+    if query.data and query.data.startswith("copy_user_api_key|"):
+        api_key = query.data.split("|", 1)[1]
+        msg = f"<code>{api_key}</code>\n\nLong press to copy."
+        await query.answer("Key copied!", show_alert=False)
+        await query.edit_message_text(msg, parse_mode='HTML', reply_markup=None)
+        return
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('add_gemini_key', None)
