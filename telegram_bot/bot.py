@@ -359,15 +359,24 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.user_data['add_gemini_key'] = True
                 return
             all_models = resp.json().get("models", [])
-            # Only show models that support generateContent
-            models = [m for m in all_models if "generateContent" in m.get("supportedGenerationMethods", [])]
+            # Only show models that support generateContent and do NOT require image input
+            def is_text_only(model):
+                # If the model's input modalities include 'image', skip it
+                # Some models may have 'inputModalities' or similar field
+                if 'inputModalities' in model and 'image' in model['inputModalities']:
+                    return False
+                # Some models may have 'supportedGenerationMethods' only
+                # If the model name or displayName contains 'vision', skip it
+                if 'vision' in model.get('name', '').lower() or 'vision' in model.get('displayName', '').lower():
+                    return False
+                return 'generateContent' in model.get('supportedGenerationMethods', [])
+            models = [m for m in all_models if is_text_only(m)]
             if not models:
-                await update.message.reply_text("❌ No usable models found for this API key.\nPlease send a valid Gemini API key, or /cancel to stop.")
+                await update.message.reply_text("❌ No usable text-only models found for this API key.\nPlease send a valid Gemini API key, or /cancel to stop.")
                 context.user_data['add_gemini_key'] = True
                 return
             context.user_data['pending_gemini_key'] = api_key
             context.user_data['pending_gemini_models'] = models
-            # Use index as callback_data to avoid Telegram's 64-byte limit
             keyboard = [[InlineKeyboardButton(m['displayName'], callback_data=f"select_gemini_model|{i}")] for i, m in enumerate(models)]
             await update.message.reply_text(
                 "Select a Gemini model for this API key:",
