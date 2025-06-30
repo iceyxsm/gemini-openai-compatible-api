@@ -18,8 +18,6 @@ queue = Queue("gemini_requests", connection=redis_conn)
 def log_usage(user_api_key, gemini_key_id, prompt_tokens, completion_tokens, total_tokens):
     pass  # TODO: Implement in supabase_client
 
-GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent")
-
 # Simple token counter (approximate, can be replaced with tiktoken or similar)
 def count_tokens(text):
     return len(text.split())
@@ -59,9 +57,10 @@ def can_send_request(region):
         return False
 
 # Gemini request worker
-def gemini_worker(payload, region, api_key):
+def gemini_worker(payload, region, api_key, model_name):
+    url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={api_key}"
     resp = requests.post(
-        f"{GEMINI_API_URL}?key={api_key}",
+        url,
         json=payload,
         timeout=30
     )
@@ -104,10 +103,11 @@ async def chat_completions(request: Request, authorization: str = Header(None)):
     last_error = None
     for key in gemini_keys:
         region = key["region"]
+        model_name = key.get("model_name", "gemini-pro")
         if can_send_request(region):
             # Send immediately
             try:
-                gemini_data, status_code = gemini_worker(gemini_payload, region, key["api_key"])
+                gemini_data, status_code = gemini_worker(gemini_payload, region, key["api_key"], model_name)
                 if status_code == 200:
                     gemini_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
                     gemini_response = gemini_data
@@ -123,7 +123,7 @@ async def chat_completions(request: Request, authorization: str = Header(None)):
                 continue
         else:
             # Over rate limit: enqueue for later
-            job = queue.enqueue(gemini_worker, gemini_payload, region, key["api_key"])
+            job = queue.enqueue(gemini_worker, gemini_payload, region, key["api_key"], model_name)
             # Wait for job to finish (blocking, or could return queued status)
             result = job.result or job.wait(timeout=65)
             if result:
