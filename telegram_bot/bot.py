@@ -447,8 +447,11 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_label = update.message.text.strip()
             api_key = create_user_api_key(user_label)
             if api_key:
-                msg = f"User API key created for '<b>{user_label}</b>':\n<code>{api_key}</code>\n\nTap the button below to copy again."
-                keyboard = [[InlineKeyboardButton("Copy", callback_data=f"copy_user_api_key|{api_key}")]]
+                msg = f"User API key created for '<b>{user_label}</b>':\n<code>{api_key}</code>\n\nTap the button below to copy again or test the key."
+                keyboard = [
+                    [InlineKeyboardButton("Copy", callback_data=f"copy_user_api_key|{api_key}"),
+                     InlineKeyboardButton("Test Chat", callback_data=f"test_user_api_key|{api_key}")]
+                ]
                 await update.message.reply_text(msg, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
             else:
                 await update.message.reply_text("Failed to create user API key.")
@@ -511,6 +514,42 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = f"<code>{api_key}</code>\n\nLong press to copy."
         await query.answer("Key copied!", show_alert=False)
         await query.edit_message_text(msg, parse_mode='HTML', reply_markup=None)
+        return
+
+    # Handler for Test Chat button
+    if query.data and query.data.startswith("test_user_api_key|"):
+        api_key = query.data.split("|", 1)[1]
+        context.user_data['test_chat_api_key'] = api_key
+        await query.edit_message_text(
+            "You are now in test chat mode for this API key.\nSend messages to test the key.\nSend /exc to exit chatbot mode.",
+            reply_markup=None
+        )
+        return
+
+    # Chatbot mode handler
+    if context.user_data.get('test_chat_api_key'):
+        if update.message.text.strip() == '/exc':
+            context.user_data.pop('test_chat_api_key', None)
+            await update.message.reply_text("Exited chatbot mode.")
+            await start(update, context)
+            return
+        # Send message to backend using the test API key
+        api_key = context.user_data['test_chat_api_key']
+        # Example: send to backend (replace with your actual backend call)
+        try:
+            resp = requests.post(
+                "http://localhost:8000/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={"messages": [{"role": "user", "content": update.message.text}]}
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                reply = data['choices'][0]['message']['content']
+                await update.message.reply_text(reply)
+            else:
+                await update.message.reply_text(f"API error: {resp.text}")
+        except Exception as e:
+            await update.message.reply_text(f"Request failed: {e}")
         return
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
