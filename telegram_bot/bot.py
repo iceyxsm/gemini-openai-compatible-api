@@ -393,6 +393,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
+    elif query.data and query.data.startswith("test_user_api_key|"):
+        api_key = query.data.split("|", 1)[1]
+        context.user_data['test_chat_api_key'] = api_key
+        await query.edit_message_text(
+            "You are now in test chat mode for this API key.\nSend messages to test the key.\nSend /exc to exit chatbot mode.",
+            reply_markup=None
+        )
+        return
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -514,16 +522,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = f"<code>{api_key}</code>\n\nLong press to copy."
         await query.answer("Key copied!", show_alert=False)
         await query.edit_message_text(msg, parse_mode='HTML', reply_markup=None)
-        return
-
-    # Handler for Test Chat button
-    if query.data and query.data.startswith("test_user_api_key|"):
-        api_key = query.data.split("|", 1)[1]
-        context.user_data['test_chat_api_key'] = api_key
-        await query.edit_message_text(
-            "You are now in test chat mode for this API key.\nSend messages to test the key.\nSend /exc to exit chatbot mode.",
-            reply_markup=None
-        )
         return
 
     # Chatbot mode handler
