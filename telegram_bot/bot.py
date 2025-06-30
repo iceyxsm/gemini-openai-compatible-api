@@ -466,7 +466,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await update.message.reply_text(f"Error: {e}")
         context.user_data['create_user_key'] = False
-        await start(update, context)
+        # Do not show main menu here; let user choose next action (copy/test chat)
     elif context.user_data.get('add_admin'):
         if user_id != SUPERADMIN_TELEGRAM_ID:
             await update.message.reply_text("Only the superadmin can add admins.")
