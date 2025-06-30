@@ -21,7 +21,7 @@ from supabase_client import (
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 SUPERADMIN_TELEGRAM_ID = os.getenv("ADMIN_TELEGRAM_ID")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, use_edit=False):
     user_id = str(update.effective_user.id)
     if not (is_admin(user_id) or user_id == str(SUPERADMIN_TELEGRAM_ID)):
         first_name = update.effective_user.first_name
@@ -37,10 +37,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id == SUPERADMIN_TELEGRAM_ID:
         keyboard.append([InlineKeyboardButton("Restart Services", callback_data="restart_services")])
         keyboard.append([InlineKeyboardButton("Update & Restart", callback_data="update_and_restart")])
-    await update.message.reply_text(
-        "Welcome to the Gemini API Admin Panel. Choose an option:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    text = "Welcome to the Gemini API Admin Panel. Choose an option:"
+    if use_edit and hasattr(update, 'callback_query') and update.callback_query:
+        try:
+            await update.callback_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        except Exception:
+            await update.callback_query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    else:
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -81,10 +85,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Bots Management:", reply_markup=InlineKeyboardMarkup(keyboard))
     elif query.data == "main_menu":
         clear_user_state()
-        try:
-            await start(update, context)
-        except Exception:
-            await query.message.reply_text("Welcome to the Gemini API Admin Panel. Choose an option:")
+        await start(update, context, use_edit=True)
     elif query.data == "vps_resources":
         cpu = psutil.cpu_percent(interval=1)
         mem = psutil.virtual_memory()
