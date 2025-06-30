@@ -3,6 +3,7 @@ import sys
 import psutil
 import subprocess
 import tempfile
+import requests
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -300,11 +301,20 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('add_gemini_key'):
         try:
             api_key = update.message.text.strip()
+            # Gemini API key checker
+            test_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+            test_payload = {"contents": [{"role": "user", "parts": [{"text": "Hello"}]}]}
+            test_params = {"key": api_key}
+            test_resp = requests.post(test_url, params=test_params, json=test_payload, timeout=10)
+            if test_resp.status_code != 200:
+                await update.message.reply_text(f"❌ Invalid Gemini API key or quota exceeded. Status: {test_resp.status_code}\n{test_resp.text}")
+                context.user_data['add_gemini_key'] = False
+                return
             existing_keys = list_keys()
             name = f"gemini_key{len(existing_keys) + 1}"
             region = "global"
             add_key(name, region, api_key)
-            await update.message.reply_text(f"Gemini API key added as {name}.")
+            await update.message.reply_text(f"✅ Gemini API key added as {name}.")
         except Exception as e:
             await update.message.reply_text(f"Error: {e}\nJust send the API key.")
         context.user_data['add_gemini_key'] = False
