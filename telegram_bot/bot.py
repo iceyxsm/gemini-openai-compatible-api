@@ -294,32 +294,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="force_update_log.txt")
         os.unlink(logf.name)
     elif query.data and query.data.startswith("select_gemini_model|"):
-        try:
-            encoded = query.data.split("|", 1)[1]
-            model_name = base64.urlsafe_b64decode(encoded).decode()
-            api_key = context.user_data.get('pending_gemini_key')
-            if not api_key:
-                await query.edit_message_text("No API key in progress. Please try again.")
-                return
-            existing_keys = list_keys()
-            name = f"gemini_key{len(existing_keys) + 1}"
-            region = "global"
-            add_key(name, region, api_key, model_name)
-            await query.edit_message_text(f"✅ Gemini API key added as {name} with model {model_name}.")
-        except Exception as e:
-            await query.edit_message_text(f"Error: {e}")
-        context.user_data.pop('pending_gemini_key', None)
-        context.user_data['add_gemini_key'] = False
-        return
-    if query.data and query.data.startswith("select_gemini_model|"):
-        import base64
-        encoded = query.data.split("|", 1)[1]
-        model_name = base64.urlsafe_b64decode(encoded).decode()
+        idx = int(query.data.split("|", 1)[1])
         models = context.user_data.get('pending_gemini_models', [])
-        model = next((m for m in models if m['name'] == model_name), None)
-        if not model:
+        if idx < 0 or idx >= len(models):
             await query.edit_message_text("Model not found. Please try again.")
             return
+        model = models[idx]
         # Show model details and Confirm/Back buttons
         details = f"<b>{model.get('displayName', model['name'])}</b>\n"
         details += f"<code>{model['name']}</code>\n\n"
@@ -327,32 +307,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         details += f"Input tokens: {model.get('inputTokenLimit', '?')}\nOutput tokens: {model.get('outputTokenLimit', '?')}\n"
         details += f"Supported: {', '.join(model.get('supportedGenerationMethods', []))}"
         keyboard = [
-            [InlineKeyboardButton("Confirm", callback_data=f"confirm_gemini_model|{encoded}")],
+            [InlineKeyboardButton("Confirm", callback_data=f"confirm_gemini_model|{idx}")],
             [InlineKeyboardButton("Back", callback_data="back_gemini_model_select")]
         ]
         await query.edit_message_text(details, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
         return
     if query.data and query.data.startswith("confirm_gemini_model|"):
-        import base64
-        encoded = query.data.split("|", 1)[1]
-        model_name = base64.urlsafe_b64decode(encoded).decode()
+        idx = int(query.data.split("|", 1)[1])
         api_key = context.user_data.get('pending_gemini_key')
-        if not api_key:
-            await query.edit_message_text("No API key in progress. Please try again.")
+        models = context.user_data.get('pending_gemini_models', [])
+        if not api_key or idx < 0 or idx >= len(models):
+            await query.edit_message_text("No API key in progress or model not found. Please try again.")
             return
+        model = models[idx]
         existing_keys = list_keys()
         name = f"gemini_key{len(existing_keys) + 1}"
         region = "global"
-        add_key(name, region, api_key, model_name)
-        await query.edit_message_text(f"✅ Gemini API key added as {name} with model {model_name}.")
+        add_key(name, region, api_key, model['name'])
+        await query.edit_message_text(f"✅ Gemini API key added as {name} with model {model['name']}.")
         context.user_data.pop('pending_gemini_key', None)
         context.user_data.pop('pending_gemini_models', None)
         context.user_data['add_gemini_key'] = False
         return
     if query.data == "back_gemini_model_select":
         models = context.user_data.get('pending_gemini_models', [])
-        import base64
-        keyboard = [[InlineKeyboardButton(m['displayName'], callback_data=f"select_gemini_model|{base64.urlsafe_b64encode(m['name'].encode()).decode()}")] for m in models]
+        keyboard = [[InlineKeyboardButton(m['displayName'], callback_data=f"select_gemini_model|{i}")] for i, m in enumerate(models)]
         await query.edit_message_text(
             "Select a Gemini model for this API key:",
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -388,8 +367,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             context.user_data['pending_gemini_key'] = api_key
             context.user_data['pending_gemini_models'] = models
-            import base64
-            keyboard = [[InlineKeyboardButton(m['displayName'], callback_data=f"select_gemini_model|{base64.urlsafe_b64encode(m['name'].encode()).decode()}")] for m in models]
+            # Use index as callback_data to avoid Telegram's 64-byte limit
+            keyboard = [[InlineKeyboardButton(m['displayName'], callback_data=f"select_gemini_model|{i}")] for i, m in enumerate(models)]
             await update.message.reply_text(
                 "Select a Gemini model for this API key:",
                 reply_markup=InlineKeyboardMarkup(keyboard)
