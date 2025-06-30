@@ -189,7 +189,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         key_id = query.data[len("del_gemini_"):]
         remove_key(key_id)
         await query.edit_message_text("Gemini key removed.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="menu_gemini")]]))
-    # User API Key flows
     elif query.data == "create_user_key":
         context.user_data['create_user_key'] = True
         await query.edit_message_text("Send a label for the new user API key (e.g. customer name or email):")
@@ -293,6 +292,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text(f"❌ Force update or restart failed: {e}\nSending log...")
             await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="force_update_log.txt")
         os.unlink(logf.name)
+    elif query.data and query.data.startswith("select_gemini_model|"):
+        try:
+            model_name = query.data.split("|", 1)[1]
+            api_key = context.user_data.get('pending_gemini_key')
+            if not api_key:
+                await query.edit_message_text("No API key in progress. Please try again.")
+                return
+            existing_keys = list_keys()
+            name = f"gemini_key{len(existing_keys) + 1}"
+            region = "global"
+            add_key(name, region, api_key, model_name)
+            await query.edit_message_text(f"✅ Gemini API key added as {name} with model {model_name}.")
+        except Exception as e:
+            await query.edit_message_text(f"Error: {e}")
+        context.user_data.pop('pending_gemini_key', None)
+        return
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -301,24 +316,29 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('add_gemini_key'):
         try:
             api_key = update.message.text.strip()
-            # Gemini API key checker
-            test_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
-            test_payload = {"contents": [{"role": "user", "parts": [{"text": "Hello"}]}]}
+            # List available models for this key
+            models_url = "https://generativelanguage.googleapis.com/v1beta/models"
             test_params = {"key": api_key}
-            test_resp = requests.post(test_url, params=test_params, json=test_payload, timeout=10)
-            if test_resp.status_code != 200:
-                await update.message.reply_text(f"❌ Invalid Gemini API key or quota exceeded. Status: {test_resp.status_code}\n{test_resp.text}")
+            resp = requests.get(models_url, params=test_params, timeout=10)
+            if resp.status_code != 200:
+                await update.message.reply_text(f"❌ Invalid Gemini API key or quota exceeded. Status: {resp.status_code}\n{resp.text}")
                 context.user_data['add_gemini_key'] = False
                 return
-            existing_keys = list_keys()
-            name = f"gemini_key{len(existing_keys) + 1}"
-            region = "global"
-            add_key(name, region, api_key)
-            await update.message.reply_text(f"✅ Gemini API key added as {name}.")
+            models = resp.json().get("models", [])
+            if not models:
+                await update.message.reply_text("❌ No models found for this API key.")
+                context.user_data['add_gemini_key'] = False
+                return
+            context.user_data['pending_gemini_key'] = api_key
+            keyboard = [[InlineKeyboardButton(m['displayName'], callback_data=f"select_gemini_model|{m['name']}")] for m in models]
+            await update.message.reply_text(
+                "Select a Gemini model for this API key:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
         except Exception as e:
             await update.message.reply_text(f"Error: {e}\nJust send the API key.")
         context.user_data['add_gemini_key'] = False
-        await start(update, context)
+        return
     elif context.user_data.get('create_user_key'):
         try:
             user_label = update.message.text.strip()

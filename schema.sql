@@ -4,6 +4,7 @@ create table if not exists projects (
   name text,
   region text,
   api_key text,
+  model_name text,
   token_limit int default 250000,
   tokens_used int default 0,
   active boolean default true,

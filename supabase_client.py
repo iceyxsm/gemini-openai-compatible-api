@@ -9,11 +9,11 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 def list_keys():
-    res = supabase.table("projects").select("id, name, region, api_key, active").execute()
+    res = supabase.table("projects").select("id, name, region, api_key, model_name, active").execute()
     return res.data if hasattr(res, 'data') else []
 
-def add_key(name, region, api_key):
-    return supabase.table("projects").insert({"name": name, "region": region, "api_key": api_key, "active": True}).execute()
+def add_key(name, region, api_key, model_name):
+    return supabase.table("projects").insert({"name": name, "region": region, "api_key": api_key, "model_name": model_name, "active": True}).execute()
 
 def remove_key(key_id):
     return supabase.table("projects").delete().eq("id", key_id).execute()
