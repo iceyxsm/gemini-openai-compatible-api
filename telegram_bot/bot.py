@@ -47,8 +47,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not (is_admin(user_id) or user_id == str(SUPERADMIN_TELEGRAM_ID)):
         await query.edit_message_text("Unauthorized.")
         return
+    # Helper to clear user state
+    def clear_user_state():
+        context.user_data.clear()
     # Main menu navigation
     if query.data == "menu_gemini":
+        clear_user_state()
         keyboard = [
             [InlineKeyboardButton("Add Gemini API Key", callback_data="add_gemini_key")],
             [InlineKeyboardButton("Remove Gemini API Key", callback_data="remove_gemini_key")],
@@ -57,6 +61,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await query.edit_message_text("Gemini API Key Management:", reply_markup=InlineKeyboardMarkup(keyboard))
     elif query.data == "menu_user":
+        clear_user_state()
         keyboard = [
             [InlineKeyboardButton("Create User API Key", callback_data="create_user_key")],
             [InlineKeyboardButton("Revoke User API Key", callback_data="revoke_user_key")],
@@ -65,6 +70,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await query.edit_message_text("User API Key Management:", reply_markup=InlineKeyboardMarkup(keyboard))
     elif query.data == "menu_bots":
+        clear_user_state()
         keyboard = [
             [InlineKeyboardButton("Create Bot", callback_data="create_bot")],
             [InlineKeyboardButton("List Bots", callback_data="list_bots")],
@@ -72,7 +78,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await query.edit_message_text("Bots Management:", reply_markup=InlineKeyboardMarkup(keyboard))
     elif query.data == "main_menu":
-        await start(update, context)
+        clear_user_state()
+        try:
+            await start(update, context)
+        except Exception:
+            await query.message.reply_text("Welcome to the Gemini API Admin Panel. Choose an option:")
     elif query.data == "vps_resources":
         cpu = psutil.cpu_percent(interval=1)
         mem = psutil.virtual_memory()
@@ -83,10 +93,40 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"RAM Usage: {mem.percent}% ({mem.used // (1024**2)}MB/{mem.total // (1024**2)}MB)\n"
             f"Disk Usage: {disk.percent}% ({disk.used // (1024**3)}GB/{disk.total // (1024**3)}GB)"
         )
-        await query.edit_message_text(msg, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
-        ]))
+        try:
+            await query.edit_message_text(
+                msg,
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("Reload", callback_data="reload_vps_resources")],
+                    [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+                ])
+            )
+        except Exception:
+            await query.message.reply_text(msg)
+    elif query.data == "reload_vps_resources":
+        cpu = psutil.cpu_percent(interval=1)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        msg = (
+            f"<b>VPS Resources</b>\n"
+            f"CPU Usage: {cpu}%\n"
+            f"RAM Usage: {mem.percent}% ({mem.used // (1024**2)}MB/{mem.total // (1024**2)}MB)\n"
+            f"Disk Usage: {disk.percent}% ({disk.used // (1024**3)}GB/{disk.total // (1024**3)}GB)"
+        )
+        try:
+            await query.edit_message_text(
+                msg,
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("Reload", callback_data="reload_vps_resources")],
+                    [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+                ])
+            )
+        except Exception:
+            await query.message.reply_text(msg)
     elif query.data == "menu_admins":
+        clear_user_state()
         admins = list_admins()
         admin_list = "\n".join([str(a) for a in admins]) or "No admins set."
         can_manage = user_id == SUPERADMIN_TELEGRAM_ID
