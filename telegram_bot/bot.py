@@ -267,6 +267,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     proc = subprocess.run(["sudo", "systemctl", "restart", svc], stdout=logf, stderr=logf)
                 logf.flush()
                 await query.edit_message_text("✅ Update complete. All services restarted. Sending log...")
+                await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="update_log.txt")
+                os.unlink(logf.name)
+                # Show main menu automatically after successful update
+                await start(query, context, use_edit=True)
+                return
             except Exception as e:
                 logf.write(str(e).encode())
                 logf.flush()
