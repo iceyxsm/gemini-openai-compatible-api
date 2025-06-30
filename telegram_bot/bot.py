@@ -403,152 +403,149 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if not (is_admin(user_id) or user_id == str(SUPERADMIN_TELEGRAM_ID)):
-        return
-    if context.user_data.get('add_gemini_key'):
-        try:
-            api_key = update.message.text.strip()
-            if api_key.lower() == '/cancel':
-                context.user_data['add_gemini_key'] = False
-                context.user_data.pop('pending_gemini_key', None)
-                await update.message.reply_text("❌ Gemini API key addition cancelled.")
-                return
-            # List available models for this key
-            models_url = "https://generativelanguage.googleapis.com/v1/models"
-            test_params = {"key": api_key}
-            resp = requests.get(models_url, params=test_params, timeout=10)
-            if resp.status_code != 200:
-                await update.message.reply_text(f"❌ Invalid Gemini API key or quota exceeded. Status: {resp.status_code}\n{resp.text}\n\nPlease send a valid Gemini API key, or /cancel to stop.")
-                context.user_data['add_gemini_key'] = True
-                return
-            all_models = resp.json().get("models", [])
-            # Only show models that support generateContent and do NOT require image input
-            def is_text_only(model):
-                # If the model's input modalities include 'image', skip it
-                # Some models may have 'inputModalities' or similar field
-                if 'inputModalities' in model and 'image' in model['inputModalities']:
-                    return False
-                # Some models may have 'supportedGenerationMethods' only
-                # If the model name or displayName contains 'vision', skip it
-                if 'vision' in model.get('name', '').lower() or 'vision' in model.get('displayName', '').lower():
-                    return False
-                return 'generateContent' in model.get('supportedGenerationMethods', [])
-            models = [m for m in all_models if is_text_only(m)]
-            if not models:
-                await update.message.reply_text("❌ No usable text-only models found for this API key.\nPlease send a valid Gemini API key, or /cancel to stop.")
-                context.user_data['add_gemini_key'] = True
-                return
-            context.user_data['pending_gemini_key'] = api_key
-            context.user_data['pending_gemini_models'] = models
-            keyboard = [[InlineKeyboardButton(m['displayName'], callback_data=f"select_gemini_model|{i}")] for i, m in enumerate(models)]
-            await update.message.reply_text(
-                "Select a Gemini model for this API key:",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        except Exception as e:
-            await update.message.reply_text(f"Error: {e}\nJust send the API key, or /cancel to stop.")
-            context.user_data['add_gemini_key'] = True
-        return
-    elif context.user_data.get('create_user_key'):
-        try:
-            user_label = update.message.text.strip()
-            api_key = create_user_api_key(user_label)
-            if api_key:
-                msg = f"User API key created for '<b>{user_label}</b>':\n<code>{api_key}</code>\n\nTap the button below to copy again or test the key."
-                keyboard = [
-                    [InlineKeyboardButton("Copy", callback_data=f"copy_user_api_key|{api_key}"),
-                     InlineKeyboardButton("Test Chat", callback_data=f"test_user_api_key|{api_key}")]
-                ]
-                await update.message.reply_text(msg, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
-            else:
-                await update.message.reply_text("Failed to create user API key.")
-        except Exception as e:
-            await update.message.reply_text(f"Error: {e}")
-        context.user_data['create_user_key'] = False
-        # Do not show main menu here; let user choose next action (copy/test chat)
-    elif context.user_data.get('add_admin'):
-        if user_id != SUPERADMIN_TELEGRAM_ID:
-            await update.message.reply_text("Only the superadmin can add admins.")
+    try:
+        user_id = str(update.effective_user.id)
+        await update.message.reply_text("[DEBUG] text_handler triggered.")
+        if not (is_admin(user_id) or user_id == str(SUPERADMIN_TELEGRAM_ID)):
             return
-        try:
-            new_admin_id = update.message.text.strip()
-            add_admin(new_admin_id)
-            await update.message.reply_text(f"Admin {new_admin_id} added.")
-        except Exception as e:
-            await update.message.reply_text(f"Error: {e}")
-        context.user_data['add_admin'] = False
-        await start(update, context)
-    elif context.user_data.get('create_bot'):
-        bot_creation = context.user_data.get('bot_creation', {})
-        if 'name' not in bot_creation:
-            bot_creation['name'] = update.message.text.strip()
-            context.user_data['bot_creation'] = bot_creation
-            await update.message.reply_text("Send the bot token:")
-        elif 'token' not in bot_creation:
-            bot_creation['token'] = update.message.text.strip()
-            context.user_data['bot_creation'] = bot_creation
-            await update.message.reply_text("(Optional) Send a base prompt for the bot, or type 'skip' to leave blank:")
-        else:
-            base_prompt = update.message.text.strip()
-            if base_prompt.lower() == 'skip':
-                base_prompt = None
-            bot_creation['base_prompt'] = base_prompt
-            res, api_key = create_bot(bot_creation['name'], bot_creation['token'], base_prompt)
-            # Get the new bot's id
-            bot_id = res.data[0]['id'] if hasattr(res, 'data') and res.data else None
-            await update.message.reply_text(f"Bot '{bot_creation['name']}' registered.\nAPI Key: {api_key}\nDeploying bot...")
-            # Deploy the bot as a systemd service
-            if bot_id:
-                try:
-                    subprocess.run([
-                        './setup/deploy_new_bot.sh',
-                        bot_creation['name'],
-                        bot_creation['token'],
-                        bot_id
-                    ], check=True)
-                    await update.message.reply_text(f"Bot '{bot_creation['name']}' deployed and running.")
-                except Exception as e:
-                    await update.message.reply_text(f"Bot registered, but deployment failed: {e}")
-            else:
-                await update.message.reply_text("Bot registered, but could not retrieve bot ID for deployment.")
-            context.user_data['create_bot'] = False
-            context.user_data['bot_creation'] = {}
-            await start(update, context)
-
-    # Handler for Copy button
-    if query.data and query.data.startswith("copy_user_api_key|"):
-        api_key = query.data.split("|", 1)[1]
-        msg = f"<code>{api_key}</code>\n\nLong press to copy."
-        await query.answer("Key copied!", show_alert=False)
-        await query.edit_message_text(msg, parse_mode='HTML', reply_markup=None)
-        return
-
-    # Chatbot mode handler
-    if context.user_data.get('test_chat_api_key'):
-        if update.message.text.strip() == '/exc':
-            context.user_data.pop('test_chat_api_key', None)
-            await update.message.reply_text("Exited chatbot mode.")
-            await start(update, context)
+        if context.user_data.get('add_gemini_key'):
+            try:
+                api_key = update.message.text.strip()
+                if api_key.lower() == '/cancel':
+                    context.user_data['add_gemini_key'] = False
+                    context.user_data.pop('pending_gemini_key', None)
+                    await update.message.reply_text("❌ Gemini API key addition cancelled.")
+                    return
+                # List available models for this key
+                models_url = "https://generativelanguage.googleapis.com/v1/models"
+                test_params = {"key": api_key}
+                resp = requests.get(models_url, params=test_params, timeout=10)
+                if resp.status_code != 200:
+                    await update.message.reply_text(f"❌ Invalid Gemini API key or quota exceeded. Status: {resp.status_code}\n{resp.text}\n\nPlease send a valid Gemini API key, or /cancel to stop.")
+                    context.user_data['add_gemini_key'] = True
+                    return
+                all_models = resp.json().get("models", [])
+                # Only show models that support generateContent and do NOT require image input
+                def is_text_only(model):
+                    # If the model's input modalities include 'image', skip it
+                    # Some models may have 'inputModalities' or similar field
+                    if 'inputModalities' in model and 'image' in model['inputModalities']:
+                        return False
+                    # Some models may have 'supportedGenerationMethods' only
+                    # If the model name or displayName contains 'vision', skip it
+                    if 'vision' in model.get('name', '').lower() or 'vision' in model.get('displayName', '').lower():
+                        return False
+                    return 'generateContent' in model.get('supportedGenerationMethods', [])
+                models = [m for m in all_models if is_text_only(m)]
+                if not models:
+                    await update.message.reply_text("❌ No usable text-only models found for this API key.\nPlease send a valid Gemini API key, or /cancel to stop.")
+                    context.user_data['add_gemini_key'] = True
+                    return
+                context.user_data['pending_gemini_key'] = api_key
+                context.user_data['pending_gemini_models'] = models
+                keyboard = [[InlineKeyboardButton(m['displayName'], callback_data=f"select_gemini_model|{i}")] for i, m in enumerate(models)]
+                await update.message.reply_text(
+                    "Select a Gemini model for this API key:",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            except Exception as e:
+                await update.message.reply_text(f"Error: {e}\nJust send the API key, or /cancel to stop.")
+                context.user_data['add_gemini_key'] = True
             return
-        # Send message to backend using the test API key
-        api_key = context.user_data['test_chat_api_key']
-        # Example: send to backend (replace with your actual backend call)
-        try:
-            resp = requests.post(
-                "http://localhost:8000/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={"messages": [{"role": "user", "content": update.message.text}]}
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                reply = data['choices'][0]['message']['content']
-                await update.message.reply_text(reply)
+        elif context.user_data.get('create_user_key'):
+            try:
+                user_label = update.message.text.strip()
+                api_key = create_user_api_key(user_label)
+                if api_key:
+                    msg = f"User API key created for '<b>{user_label}</b>':\n<code>{api_key}</code>\n\nTap the button below to copy again or test the key."
+                    keyboard = [
+                        [InlineKeyboardButton("Copy", callback_data=f"copy_user_api_key|{api_key}"),
+                         InlineKeyboardButton("Test Chat", callback_data=f"test_user_api_key|{api_key}")]
+                    ]
+                    await update.message.reply_text(msg, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
+                else:
+                    await update.message.reply_text("Failed to create user API key.")
+            except Exception as e:
+                await update.message.reply_text(f"Error: {e}")
+            context.user_data['create_user_key'] = False
+            # Do not show main menu here; let user choose next action (copy/test chat)
+        elif context.user_data.get('add_admin'):
+            if user_id != SUPERADMIN_TELEGRAM_ID:
+                await update.message.reply_text("Only the superadmin can add admins.")
+                return
+            try:
+                new_admin_id = update.message.text.strip()
+                add_admin(new_admin_id)
+                await update.message.reply_text(f"Admin {new_admin_id} added.")
+            except Exception as e:
+                await update.message.reply_text(f"Error: {e}")
+            context.user_data['add_admin'] = False
+            await start(update, context)
+        elif context.user_data.get('create_bot'):
+            bot_creation = context.user_data.get('bot_creation', {})
+            if 'name' not in bot_creation:
+                bot_creation['name'] = update.message.text.strip()
+                context.user_data['bot_creation'] = bot_creation
+                await update.message.reply_text("Send the bot token:")
+            elif 'token' not in bot_creation:
+                bot_creation['token'] = update.message.text.strip()
+                context.user_data['bot_creation'] = bot_creation
+                await update.message.reply_text("(Optional) Send a base prompt for the bot, or type 'skip' to leave blank:")
             else:
-                await update.message.reply_text(f"API error: {resp.text}")
-        except Exception as e:
-            await update.message.reply_text(f"Request failed: {e}")
-        return
+                base_prompt = update.message.text.strip()
+                if base_prompt.lower() == 'skip':
+                    base_prompt = None
+                bot_creation['base_prompt'] = base_prompt
+                res, api_key = create_bot(bot_creation['name'], bot_creation['token'], base_prompt)
+                # Get the new bot's id
+                bot_id = res.data[0]['id'] if hasattr(res, 'data') and res.data else None
+                await update.message.reply_text(f"Bot '{bot_creation['name']}' registered.\nAPI Key: {api_key}\nDeploying bot...")
+                # Deploy the bot as a systemd service
+                if bot_id:
+                    try:
+                        subprocess.run([
+                            './setup/deploy_new_bot.sh',
+                            bot_creation['name'],
+                            bot_creation['token'],
+                            bot_id
+                        ], check=True)
+                        await update.message.reply_text(f"Bot '{bot_creation['name']}' deployed and running.")
+                    except Exception as e:
+                        await update.message.reply_text(f"Bot registered, but deployment failed: {e}")
+                else:
+                    await update.message.reply_text("Bot registered, but could not retrieve bot ID for deployment.")
+                context.user_data['create_bot'] = False
+                context.user_data['bot_creation'] = {}
+                await start(update, context)
+
+        # Chatbot mode handler
+        if context.user_data.get('test_chat_api_key'):
+            await update.message.reply_text("[DEBUG] In chatbot mode block.")
+            if update.message.text.strip() == '/exc':
+                context.user_data.pop('test_chat_api_key', None)
+                await update.message.reply_text("Exited chatbot mode.")
+                await start(update, context)
+                return
+            api_key = context.user_data['test_chat_api_key']
+            try:
+                await update.message.reply_text("[DEBUG] Sending to backend...")
+                resp = requests.post(
+                    "http://localhost:8000/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={"messages": [{"role": "user", "content": update.message.text}]}
+                )
+                await update.message.reply_text(f"[DEBUG] Backend status: {resp.status_code}")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    reply = data['choices'][0]['message']['content']
+                    await update.message.reply_text(reply)
+                else:
+                    await update.message.reply_text(f"API error: {resp.text}")
+            except Exception as e:
+                await update.message.reply_text(f"[DEBUG] Request failed: {e}")
+            return
+    except Exception as e:
+        await update.message.reply_text(f"[DEBUG] Handler error: {e}")
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('add_gemini_key', None)
