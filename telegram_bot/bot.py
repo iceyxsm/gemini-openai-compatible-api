@@ -2,6 +2,7 @@ import os
 import sys
 import psutil
 import subprocess
+import tempfile
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -225,27 +226,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("Only the owner can restart services.")
             return
         await query.edit_message_text("Restarting all services...")
-        try:
-            subprocess.run(["sudo", "systemctl", "restart", "ggpt-backend"], check=True)
-            subprocess.run(["sudo", "systemctl", "restart", "ggpt-telegram-bot"], check=True)
-            subprocess.run(["sudo", "systemctl", "restart", "ggpt-rq-worker"], check=True)
-            await query.edit_message_text("✅ All services restarted.")
-        except Exception as e:
-            await query.edit_message_text(f"❌ Failed to restart services: {e}")
+        with tempfile.NamedTemporaryFile(delete=False, mode="w+b", suffix=".txt") as logf:
+            try:
+                for svc in ["ggpt-backend", "ggpt-telegram-bot", "ggpt-rq-worker"]:
+                    proc = subprocess.run(["sudo", "systemctl", "restart", svc], stdout=logf, stderr=logf)
+                logf.flush()
+                await query.edit_message_text("✅ All services restarted. Sending log...")
+            except Exception as e:
+                logf.write(str(e).encode())
+                logf.flush()
+                await query.edit_message_text(f"❌ Failed to restart services: {e}\nSending log...")
+            await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="restart_log.txt")
+        os.unlink(logf.name)
     elif query.data == "update_and_restart":
         if user_id != SUPERADMIN_TELEGRAM_ID:
             await query.edit_message_text("Only the owner can update and restart.")
             return
         await query.edit_message_text("Updating code, installing dependencies, and restarting all services...")
-        try:
-            subprocess.run(["git", "pull", "origin", "main"], check=True)
-            subprocess.run([".venv/bin/pip", "install", "-r", "requirements.txt"], check=True)
-            subprocess.run(["sudo", "systemctl", "restart", "ggpt-backend"], check=True)
-            subprocess.run(["sudo", "systemctl", "restart", "ggpt-telegram-bot"], check=True)
-            subprocess.run(["sudo", "systemctl", "restart", "ggpt-rq-worker"], check=True)
-            await query.edit_message_text("✅ Code updated and all services restarted.")
-        except Exception as e:
-            await query.edit_message_text(f"❌ Update or restart failed: {e}")
+        with tempfile.NamedTemporaryFile(delete=False, mode="w+b", suffix=".txt") as logf:
+            try:
+                proc = subprocess.run(["git", "pull", "origin", "main"], stdout=logf, stderr=logf)
+                proc = subprocess.run([".venv/bin/pip", "install", "-r", "requirements.txt"], stdout=logf, stderr=logf)
+                for svc in ["ggpt-backend", "ggpt-telegram-bot", "ggpt-rq-worker"]:
+                    proc = subprocess.run(["sudo", "systemctl", "restart", svc], stdout=logf, stderr=logf)
+                logf.flush()
+                await query.edit_message_text("✅ Code updated and all services restarted. Sending log...")
+            except Exception as e:
+                logf.write(str(e).encode())
+                logf.flush()
+                await query.edit_message_text(f"❌ Update or restart failed: {e}\nSending log...")
+            await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="update_log.txt")
+        os.unlink(logf.name)
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
