@@ -190,19 +190,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = []
         for k in keys:
             label = f"{k['name']} ({k['region']}, {k.get('model_name', '?')})"
-            revoke_btn = InlineKeyboardButton("Revoke", callback_data=f"revoke_gemini_confirm|{k['id']}|{label}")
+            revoke_btn = InlineKeyboardButton("Revoke", callback_data=f"confirm_del_gemini_{k['id']}")
             keyboard.append([InlineKeyboardButton(label, callback_data="noop"), revoke_btn])
         keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="menu_gemini")])
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-    elif query.data.startswith("revoke_gemini_confirm|"):
-        _, key_id, label = query.data.split("|", 2)
-        msg = f"Are you sure you want to revoke this Gemini key?\n<b>{label}</b>"
+    elif query.data.startswith("confirm_del_gemini_"):
+        key_id = query.data[len("confirm_del_gemini_"):]
+        # Find key info for display
+        keys = list_keys()
+        k = next((x for x in keys if str(x['id']) == key_id), None)
+        if not k:
+            await query.edit_message_text("Key not found.")
+            return
+        label = f"{k['name']} ({k['region']}, {k.get('model_name', '?')})"
         keyboard = [
-            [InlineKeyboardButton("Confirm", callback_data=f"revoke_gemini_final|{key_id}"), InlineKeyboardButton("Back", callback_data="list_gemini_keys")]
+            [InlineKeyboardButton("Confirm", callback_data=f"del_gemini_{key_id}"), InlineKeyboardButton("Back", callback_data="list_gemini_keys")]
         ]
-        await query.edit_message_text(msg, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
-    elif query.data.startswith("revoke_gemini_final|"):
-        key_id = query.data.split("|", 1)[1]
+        await query.edit_message_text(f"Are you sure you want to revoke this Gemini key?\n<b>{label}</b>", parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
+    elif query.data.startswith("del_gemini_"):
+        key_id = query.data[len("del_gemini_"):]
         remove_key(key_id)
         await query.edit_message_text("Gemini key revoked.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="list_gemini_keys")]]))
     elif query.data == "create_user_key":
@@ -227,20 +233,26 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = []
         for k in keys:
             label = f"{k['user_label']} ({k['key'][:6]}...)"
-            revoke_btn = InlineKeyboardButton("Revoke", callback_data=f"revoke_user_confirm|{k['id']}|{label}")
+            revoke_btn = InlineKeyboardButton("Revoke", callback_data=f"confirm_del_user_{k['id']}")
             status = '✅' if k['active'] else '❌'
             keyboard.append([InlineKeyboardButton(f"{label} {status}", callback_data="noop"), revoke_btn])
         keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="menu_user")])
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-    elif query.data.startswith("revoke_user_confirm|"):
-        _, key_id, label = query.data.split("|", 2)
-        msg = f"Are you sure you want to revoke this user API key?\n<b>{label}</b>"
+    elif query.data.startswith("confirm_del_user_"):
+        key_id = query.data[len("confirm_del_user_"):]
+        # Find key info for display
+        keys = list_user_api_keys()
+        k = next((x for x in keys if str(x['id']) == key_id), None)
+        if not k:
+            await query.edit_message_text("Key not found.")
+            return
+        label = f"{k['user_label']} ({k['key'][:6]}...)"
         keyboard = [
-            [InlineKeyboardButton("Confirm", callback_data=f"revoke_user_final|{key_id}"), InlineKeyboardButton("Back", callback_data="list_user_keys")]
+            [InlineKeyboardButton("Confirm", callback_data=f"del_user_{key_id}"), InlineKeyboardButton("Back", callback_data="list_user_keys")]
         ]
-        await query.edit_message_text(msg, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
-    elif query.data.startswith("revoke_user_final|"):
-        key_id = query.data.split("|", 1)[1]
+        await query.edit_message_text(f"Are you sure you want to revoke this user API key?\n<b>{label}</b>", parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
+    elif query.data.startswith("del_user_"):
+        key_id = query.data[len("del_user_"):]
         revoke_user_api_key(key_id)
         await query.edit_message_text("User API key revoked.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="list_user_keys")]]))
     elif query.data == "create_bot":
