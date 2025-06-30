@@ -266,13 +266,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for svc in ["ggpt-backend", "ggpt-telegram-bot", "ggpt-rq-worker"]:
                     proc = subprocess.run(["sudo", "systemctl", "restart", svc], stdout=logf, stderr=logf)
                 logf.flush()
-                await query.edit_message_text("✅ Code updated and all services restarted. Sending log...")
+                await query.edit_message_text("✅ Update complete. All services restarted. Sending log...")
             except Exception as e:
                 logf.write(str(e).encode())
                 logf.flush()
                 await query.edit_message_text(f"❌ Update or restart failed: {e}\nSending log...")
             await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="update_log.txt")
         os.unlink(logf.name)
+        # Show main menu automatically
+        await start(query, context, use_edit=True)
+        return
     elif query.data == "force_update_and_restart":
         if user_id != SUPERADMIN_TELEGRAM_ID:
             await query.edit_message_text("Only the owner can force update and restart.")
@@ -293,6 +296,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text(f"❌ Force update or restart failed: {e}\nSending log...")
             await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="force_update_log.txt")
         os.unlink(logf.name)
+        # Show main menu automatically
+        await start(query, context, use_edit=True)
+        return
     elif query.data and query.data.startswith("select_gemini_model|"):
         idx = int(query.data.split("|", 1)[1])
         models = context.user_data.get('pending_gemini_models', [])
@@ -328,6 +334,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop('pending_gemini_key', None)
         context.user_data.pop('pending_gemini_models', None)
         context.user_data['add_gemini_key'] = False
+        # Show main menu automatically
+        await start(query, context, use_edit=True)
         return
     if query.data == "back_gemini_model_select":
         models = context.user_data.get('pending_gemini_models', [])
