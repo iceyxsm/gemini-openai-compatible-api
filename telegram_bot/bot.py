@@ -247,6 +247,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with tempfile.NamedTemporaryFile(delete=False, mode="w+b", suffix=".txt") as logf:
             try:
                 proc = subprocess.run(["git", "pull", "origin", "main"], stdout=logf, stderr=logf)
+                logf.flush()
+                logf.seek(0)
+                log_content = logf.read().decode(errors="ignore")
+                if "Your local changes to the following files would be overwritten by merge" in log_content:
+                    await query.edit_message_text(
+                        "❌ Update failed: Uncommitted changes detected. Please commit or stash your changes, or use Force Update to discard them.",
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton("Force Update (Discard Local Changes)", callback_data="force_update_and_restart")],
+                            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+                        ])
+                    )
+                    await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="update_log.txt")
+                    os.unlink(logf.name)
+                    return
                 proc = subprocess.run([".venv/bin/pip", "install", "-r", "requirements.txt"], stdout=logf, stderr=logf)
                 for svc in ["ggpt-backend", "ggpt-telegram-bot", "ggpt-rq-worker"]:
                     proc = subprocess.run(["sudo", "systemctl", "restart", svc], stdout=logf, stderr=logf)
@@ -257,6 +271,26 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logf.flush()
                 await query.edit_message_text(f"❌ Update or restart failed: {e}\nSending log...")
             await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="update_log.txt")
+        os.unlink(logf.name)
+    elif query.data == "force_update_and_restart":
+        if user_id != SUPERADMIN_TELEGRAM_ID:
+            await query.edit_message_text("Only the owner can force update and restart.")
+            return
+        await query.edit_message_text("Force updating: discarding local changes, pulling latest code, and restarting all services...")
+        with tempfile.NamedTemporaryFile(delete=False, mode="w+b", suffix=".txt") as logf:
+            try:
+                proc = subprocess.run(["git", "reset", "--hard", "HEAD"], stdout=logf, stderr=logf)
+                proc = subprocess.run(["git", "pull", "origin", "main"], stdout=logf, stderr=logf)
+                proc = subprocess.run([".venv/bin/pip", "install", "-r", "requirements.txt"], stdout=logf, stderr=logf)
+                for svc in ["ggpt-backend", "ggpt-telegram-bot", "ggpt-rq-worker"]:
+                    proc = subprocess.run(["sudo", "systemctl", "restart", svc], stdout=logf, stderr=logf)
+                logf.flush()
+                await query.edit_message_text("✅ Force update complete. All services restarted. Sending log...")
+            except Exception as e:
+                logf.write(str(e).encode())
+                logf.flush()
+                await query.edit_message_text(f"❌ Force update or restart failed: {e}\nSending log...")
+            await context.bot.send_document(chat_id=query.message.chat_id, document=open(logf.name, "rb"), filename="force_update_log.txt")
         os.unlink(logf.name)
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
