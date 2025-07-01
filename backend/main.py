@@ -68,6 +68,8 @@ def gemini_worker(payload, region, api_key, model_name):
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request, authorization: str = Header(None)):
+    start_time = time.time()
+    # logging.warning(f"[TIMING] chat_completions start: {start_time}")
     if not authorization or not authorization.startswith("Bearer "):
         return openai_error("Missing or invalid Authorization header", "invalid_api_key", 401)
     user_api_key = authorization.split(" ", 1)[1]
@@ -100,6 +102,7 @@ async def chat_completions(request: Request, authorization: str = Header(None)):
     gemini_text = None
     used_key_id = None
     last_error = None
+    api_duration = None
 
     for key in gemini_keys:
         region = key["region"]
@@ -107,7 +110,11 @@ async def chat_completions(request: Request, authorization: str = Header(None)):
         # logging.warning(f"[DEBUG] Using model: {model_name} for region: {region}")
         if can_send_request(region):
             try:
+                api_start = time.time()
                 gemini_data, status_code = gemini_worker(gemini_payload, region, key["api_key"], model_name)
+                api_end = time.time()
+                api_duration = api_end - api_start
+                # logging.warning(f"[TIMING] Gemini API call took {api_end - api_start:.2f} seconds")
                 if status_code == 200:
                     gemini_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
                     used_key_id = key["id"]
@@ -121,14 +128,21 @@ async def chat_completions(request: Request, authorization: str = Header(None)):
                 last_error = str(e)
                 continue
         else:
+            api_start = time.time()
             # logging.warning(f"[DEBUG] Skipping queue fallback; making direct Gemini API call for {region}")
             gemini_data, status_code = gemini_worker(gemini_payload, region, key["api_key"], model_name)
+            api_end = time.time()
+            api_duration = api_end - api_start
+            # logging.warning(f"[TIMING] Gemini API call (fallback) took {api_end - api_start:.2f} seconds")
             if status_code == 200:
                 gemini_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
                 used_key_id = key["id"]
                 break
             else:
                 last_error = gemini_data.get("error", {}).get("message", "Gemini API error")
+    end_time = time.time()
+    total_duration = end_time - start_time
+    # logging.warning(f"[TIMING] chat_completions total time: {end_time - start_time:.2f} seconds")
 
     if gemini_text is None:
         return openai_error(f"Gemini API error: {last_error}", status=500)
@@ -156,6 +170,10 @@ async def chat_completions(request: Request, authorization: str = Header(None)):
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
             "total_tokens": total_tokens
+        },
+        "timing": {
+            "total": round(total_duration, 2),
+            "api": round(api_duration, 2) if api_duration is not None else None
         }
     }
     return openai_response

@@ -565,6 +565,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if resp.status_code == 200:
                     reply = data['choices'][0]['message']['content']
                     await update.message.reply_text(reply)
+                    timing = data.get('timing')
+                    if timing:
+                        await update.message.reply_text(f"⏱️ Timing:\nTotal: {timing.get('total', '?')}s\nGemini API: {timing.get('api', '?')}s")
                 else:
                     await update.message.reply_text(
                         f"❌ Gemini API returned an error:\n<code>{resp.text[:1000]}</code>",
@@ -586,10 +589,22 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('pending_gemini_key', None)
     await update.message.reply_text("❌ Gemini API key addition cancelled.")
 
+async def exc_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    if not (is_admin(user_id) or user_id == str(SUPERADMIN_TELEGRAM_ID)):
+        return
+    if context.user_data.get('test_chat_api_key'):
+        context.user_data.pop('test_chat_api_key', None)
+        await update.message.reply_text("Exited chatbot mode.")
+        await start(update, context, use_edit=False)
+    else:
+        await update.message.reply_text("Not in test chat mode.")
+
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("cancel", cancel))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+    app.add_handler(CommandHandler("exc", exc_handler))
     app.run_polling() 
