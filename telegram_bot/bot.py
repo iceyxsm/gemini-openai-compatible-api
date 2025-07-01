@@ -35,6 +35,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, use_edit=Fal
         [InlineKeyboardButton("Bots", callback_data="menu_bots")],
         [InlineKeyboardButton("VPS Resources", callback_data="vps_resources")],
         [InlineKeyboardButton("Admins", callback_data="menu_admins")],
+        [InlineKeyboardButton("Test Chat", callback_data="test_chat_menu")],
     ]
     if user_id == SUPERADMIN_TELEGRAM_ID:
         keyboard.append([InlineKeyboardButton("Restart Services", callback_data="restart_services")])
@@ -396,7 +397,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
-    elif query.data and query.data.startswith("test_user_api_key|"):
+    elif query.data == "test_chat_menu":
+        clear_user_state()
+        keys = list_user_api_keys()
+        if not keys:
+            await query.edit_message_text("No user API keys found.")
+            return
+        keyboard = [[InlineKeyboardButton(f"{k['user_label']} ({k['key'][:6]}...)", callback_data=f"test_chat_select_key|{k['key']}")] for k in keys if k['active']]
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="main_menu")])
+        await query.edit_message_text("Select a user API key to test chat:", reply_markup=InlineKeyboardMarkup(keyboard))
+    elif query.data and query.data.startswith("test_chat_select_key|"):
         api_key = query.data.split("|", 1)[1]
         context.user_data['test_chat_api_key'] = api_key
         await query.edit_message_text(
