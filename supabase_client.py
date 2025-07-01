@@ -55,7 +55,10 @@ def create_user_api_key(user_label):
     return api_key if res else None
 
 def revoke_user_api_key(key_id):
-    return supabase.table("user_api_keys").update({"active": False}).eq("id", key_id).execute()
+    result = supabase.table("user_api_keys").update({"active": False}).eq("id", key_id).execute()
+    _list_user_keys_cache["data"] = None
+    _list_user_keys_cache["ts"] = 0
+    return result
 
 def is_valid_user_api_key(api_key):
     res = supabase.table("user_api_keys").select("id").eq("key", api_key).eq("active", True).execute()
