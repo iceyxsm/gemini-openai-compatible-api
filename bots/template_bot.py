@@ -2,7 +2,7 @@ import os
 import requests
 import logging
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters, CommandHandler
 from supabase import create_client
 from dotenv import load_dotenv
 
@@ -33,7 +33,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     messages = []
     if BASE_PROMPT:
-        messages.append({"role": "system", "content": BASE_PROMPT})
+        messages.append({"role": "user", "content": BASE_PROMPT})
     messages.append({"role": "user", "content": user_message})
     headers = {"Authorization": f"Bearer {API_KEY}"}
     payload = {
@@ -53,8 +53,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply = f"Error: {e}"
     await update.message.reply_text(reply)
 
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Welcome! Send me a message and I'll reply using Gemini.")
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.run_polling() 
