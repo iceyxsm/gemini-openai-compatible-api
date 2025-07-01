@@ -2,15 +2,26 @@ import os
 import secrets
 from supabase import create_client, Client
 from datetime import datetime
+import time
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+# --- Gemini Key Caching ---
+_list_keys_cache = {"data": None, "ts": 0}
+_LIST_KEYS_TTL = 300  # seconds
+
 def list_keys():
+    now = time.time()
+    if _list_keys_cache["data"] is not None and now - _list_keys_cache["ts"] < _LIST_KEYS_TTL:
+        return _list_keys_cache["data"]
     res = supabase.table("projects").select("id, name, region, api_key, model_name, active").execute()
-    return res.data if hasattr(res, 'data') else []
+    data = res.data if hasattr(res, 'data') else []
+    _list_keys_cache["data"] = data
+    _list_keys_cache["ts"] = now
+    return data
 
 def add_key(name, region, api_key, model_name):
     return supabase.table("projects").insert({"name": name, "region": region, "api_key": api_key, "model_name": model_name, "active": True}).execute()
