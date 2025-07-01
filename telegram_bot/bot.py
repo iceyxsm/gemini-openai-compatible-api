@@ -40,6 +40,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, use_edit=Fal
     if user_id == SUPERADMIN_TELEGRAM_ID:
         keyboard.append([InlineKeyboardButton("Restart Services", callback_data="restart_services")])
         keyboard.append([InlineKeyboardButton("Update & Restart", callback_data="update_and_restart")])
+        keyboard.append([InlineKeyboardButton("Update All Child Bots", callback_data="update_all_child_bots")])
     text = "Welcome to the Gemini API Admin Panel. Choose an option:"
     if use_edit and hasattr(update, 'callback_query') and update.callback_query:
         try:
@@ -419,6 +420,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "You are now in test chat mode for this API key.\nSend messages to test the key.\nSend /exc to exit chatbot mode.",
             reply_markup=None
         )
+        return
+    elif query.data == "update_all_child_bots":
+        import subprocess
+        try:
+            result = subprocess.run(["bash", "./update_all_bots.sh"], capture_output=True, text=True)
+            output = result.stdout or result.stderr or "(No output)"
+            await query.edit_message_text(f"✅ All child bots updated.\n\nOutput:\n<code>{output}</code>", parse_mode='HTML')
+        except Exception as e:
+            await query.edit_message_text(f"❌ Failed to update child bots: {e}")
         return
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
