@@ -121,16 +121,14 @@ async def chat_completions(request: Request, authorization: str = Header(None)):
                 last_error = str(e)
                 continue
         else:
-            job = queue.enqueue(gemini_worker, gemini_payload, region, key["api_key"], model_name)
-            result = job.result or job.wait(timeout=65)
-            if result:
-                gemini_data, status_code = result
-                if status_code == 200:
-                    gemini_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
-                    used_key_id = key["id"]
-                    break
-                else:
-                    last_error = gemini_data.get("error", {}).get("message", "Gemini API error")
+            # logging.warning(f"[DEBUG] Skipping queue fallback; making direct Gemini API call for {region}")
+            gemini_data, status_code = gemini_worker(gemini_payload, region, key["api_key"], model_name)
+            if status_code == 200:
+                gemini_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
+                used_key_id = key["id"]
+                break
+            else:
+                last_error = gemini_data.get("error", {}).get("message", "Gemini API error")
 
     if gemini_text is None:
         return openai_error(f"Gemini API error: {last_error}", status=500)
