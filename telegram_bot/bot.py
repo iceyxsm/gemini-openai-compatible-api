@@ -518,7 +518,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.user_data['bot_creation'] = {}
                 await start(update, context)
 
-        # Chatbot mode handler
+        # ✅ Chatbot mode (test user API key)
         if context.user_data.get('test_chat_api_key'):
             await update.message.reply_text("[DEBUG] In chatbot mode block.")
             if update.message.text.strip() == '/exc':
@@ -526,23 +526,43 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("Exited chatbot mode.")
                 await start(update, context)
                 return
+
             api_key = context.user_data['test_chat_api_key']
             try:
                 await update.message.reply_text("[DEBUG] Sending to backend...")
+
                 resp = requests.post(
                     "http://localhost:8000/v1/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}"},
-                    json={"messages": [{"role": "user", "content": update.message.text}]}
+                    json={"messages": [{"role": "user", "content": update.message.text}]},
+                    timeout=15
                 )
+
                 await update.message.reply_text(f"[DEBUG] Backend status: {resp.status_code}")
-                if resp.status_code == 200:
+
+                try:
                     data = resp.json()
+                except Exception as json_error:
+                    await update.message.reply_text(
+                        f"❌ Failed to parse JSON:\n<code>{resp.text[:1000]}</code>\n\n<b>Exception:</b> {json_error}",
+                        parse_mode='HTML'
+                    )
+                    return
+
+                if resp.status_code == 200:
                     reply = data['choices'][0]['message']['content']
                     await update.message.reply_text(reply)
                 else:
-                    await update.message.reply_text(f"API error: {resp.text}")
+                    await update.message.reply_text(
+                        f"❌ Gemini API returned an error:\n<code>{resp.text[:1000]}</code>",
+                        parse_mode='HTML'
+                    )
+
             except Exception as e:
-                await update.message.reply_text(f"[DEBUG] Request failed: {e}")
+                await update.message.reply_text(
+                    f"❌ Request to Gemini backend failed:\n<code>{e}</code>",
+                    parse_mode='HTML'
+                )
             return
     except Exception as e:
         await update.message.reply_text(f"[DEBUG] Handler error: {e}")
