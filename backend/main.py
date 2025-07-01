@@ -97,10 +97,10 @@ async def chat_completions(request: Request, authorization: str = Header(None)):
         return openai_error("No active Gemini API keys configured", status=500)
 
     gemini_payload = {
-        "contents": [{
-            "role": m["role"],
-            "parts": [{"text": m["content"]}] if "content" in m else []
-        } for m in messages]
+        "contents": [
+            {"parts": [{"text": m["content"]}]}
+            for m in messages if "content" in m
+        ]
     }
 
     gemini_response = None
