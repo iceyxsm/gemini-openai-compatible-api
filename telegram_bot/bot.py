@@ -523,8 +523,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ✅ Chatbot mode (test user API key)
         if context.user_data.get('test_chat_api_key'):
-            #             await update.message.reply_text("[DEBUG] In chatbot mode block.")
-            if update.message.text.strip() == '/exc':
+            text = update.message.text.strip().lower()
+            if '/exc' in text:
                 context.user_data.pop('test_chat_api_key', None)
                 await update.message.reply_text("Exited chatbot mode.")
                 await start(update, context, use_edit=False)
