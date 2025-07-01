@@ -381,8 +381,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         model_name = model['name']
         if model_name.startswith('models/'):
             model_name = model_name.split('/', 1)[1]
-        add_key(name, region, api_key, model_name)
-        await query.edit_message_text(f"✅ Gemini API key added as {name} with model {model_name}.")
+        try:
+            res = add_key(name, region, api_key, model_name)
+            if not res or not hasattr(res, 'data') or not res.data:
+                await query.edit_message_text("❌ Failed to add Gemini API key. Please try again.")
+            else:
+                await query.edit_message_text(f"✅ Gemini API key added as {name} with model {model_name}.")
+        except Exception as e:
+            await query.edit_message_text(f"❌ Error adding Gemini API key: {e}")
         context.user_data.pop('pending_gemini_key', None)
         context.user_data.pop('pending_gemini_models', None)
         context.user_data['add_gemini_key'] = False
