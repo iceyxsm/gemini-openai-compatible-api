@@ -377,8 +377,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         existing_keys = list_keys()
         name = f"gemini_key{len(existing_keys) + 1}"
         region = "global"
-        add_key(name, region, api_key, model['name'])
-        await query.edit_message_text(f"✅ Gemini API key added as {name} with model {model['name']}.")
+        model_name = model['name']
+        if model_name.startswith('models/'):
+            model_name = model_name.split('/', 1)[1]
+        add_key(name, region, api_key, model_name)
+        await query.edit_message_text(f"✅ Gemini API key added as {name} with model {model_name}.")
         context.user_data.pop('pending_gemini_key', None)
         context.user_data.pop('pending_gemini_models', None)
         context.user_data['add_gemini_key'] = False
@@ -535,7 +538,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "http://localhost:8000/v1/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}"},
                     json={"messages": [{"role": "user", "content": update.message.text}]},
-                    timeout=15
+                    timeout=30
                 )
 
                 await update.message.reply_text(f"[DEBUG] Backend status: {resp.status_code}")

@@ -59,7 +59,7 @@ def gemini_worker(payload, region, api_key, model_name):
     logging.warning(f"[DEBUG] Payload: {payload}")
     logging.warning(f"[DEBUG] Model: {model_name}")
     logging.warning(f"[DEBUG] API key: {api_key[:6]}{'*' * (len(api_key)-6)}")
-    resp = requests.post(url, json=payload, timeout=30)
+    resp = requests.post(url, json=payload, timeout=60)
     logging.warning(f"[DEBUG] Raw Gemini API response: {resp.text}")
     try:
         return resp.json(), resp.status_code
