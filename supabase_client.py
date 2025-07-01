@@ -29,7 +29,20 @@ def add_key(name, region, api_key, model_name):
 def remove_key(key_id):
     return supabase.table("projects").delete().eq("id", key_id).execute()
 
-# --- User API Key Management ---
+# --- User API Key Caching ---
+_list_user_keys_cache = {"data": None, "ts": 0}
+_LIST_USER_KEYS_TTL = 300  # seconds
+
+def list_user_api_keys():
+    now = time.time()
+    if _list_user_keys_cache["data"] is not None and now - _list_user_keys_cache["ts"] < _LIST_USER_KEYS_TTL:
+        return _list_user_keys_cache["data"]
+    res = supabase.table("user_api_keys").select("id, user_label, key, active, created_at").execute()
+    data = res.data if hasattr(res, 'data') else []
+    _list_user_keys_cache["data"] = data
+    _list_user_keys_cache["ts"] = now
+    return data
+
 def create_user_api_key(user_label):
     api_key = secrets.token_urlsafe(32)
     now = datetime.utcnow().isoformat()
@@ -40,10 +53,6 @@ def create_user_api_key(user_label):
         "created_at": now
     }).execute()
     return api_key if res else None
-
-def list_user_api_keys():
-    res = supabase.table("user_api_keys").select("id, user_label, key, active, created_at").execute()
-    return res.data if hasattr(res, 'data') else []
 
 def revoke_user_api_key(key_id):
     return supabase.table("user_api_keys").update({"active": False}).eq("id", key_id).execute()
