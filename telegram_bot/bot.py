@@ -408,7 +408,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user_id = str(update.effective_user.id)
-        await update.message.reply_text("[DEBUG] text_handler triggered.")
+        #         await update.message.reply_text("[DEBUG] text_handler triggered.")
         if not (is_admin(user_id) or user_id == str(SUPERADMIN_TELEGRAM_ID)):
             return
         if context.user_data.get('add_gemini_key'):
@@ -523,7 +523,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ✅ Chatbot mode (test user API key)
         if context.user_data.get('test_chat_api_key'):
-            await update.message.reply_text("[DEBUG] In chatbot mode block.")
+            #             await update.message.reply_text("[DEBUG] In chatbot mode block.")
             if update.message.text.strip() == '/exc':
                 context.user_data.pop('test_chat_api_key', None)
                 await update.message.reply_text("Exited chatbot mode.")
@@ -532,7 +532,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             api_key = context.user_data['test_chat_api_key']
             try:
-                await update.message.reply_text("[DEBUG] Sending to backend...")
+                #                 await update.message.reply_text("[DEBUG] Sending to backend...")
 
                 resp = requests.post(
                     "http://localhost:8000/v1/chat/completions",
@@ -541,7 +541,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     timeout=30
                 )
 
-                await update.message.reply_text(f"[DEBUG] Backend status: {resp.status_code}")
+                #                 await update.message.reply_text(f"[DEBUG] Backend status: {resp.status_code}")
 
                 try:
                     data = resp.json()
@@ -568,6 +568,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             return
     except Exception as e:
+        #         await update.message.reply_text(f"[DEBUG] Handler error: {e}")
         await update.message.reply_text(f"[DEBUG] Handler error: {e}")
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):

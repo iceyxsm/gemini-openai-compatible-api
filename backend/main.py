@@ -55,12 +55,12 @@ def can_send_request(region):
 
 def gemini_worker(payload, region, api_key, model_name):
     url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={api_key}"
-    logging.warning(f"[DEBUG] Gemini API call: url={url}")
-    logging.warning(f"[DEBUG] Payload: {payload}")
-    logging.warning(f"[DEBUG] Model: {model_name}")
-    logging.warning(f"[DEBUG] API key: {api_key[:6]}{'*' * (len(api_key)-6)}")
+    # logging.warning(f"[DEBUG] Gemini API call: url={url}")
+    # logging.warning(f"[DEBUG] Payload: {payload}")
+    # logging.warning(f"[DEBUG] Model: {model_name}")
+    # logging.warning(f"[DEBUG] API key: {api_key[:6]}{'*' * (len(api_key)-6)}")
     resp = requests.post(url, json=payload, timeout=60)
-    logging.warning(f"[DEBUG] Raw Gemini API response: {resp.text}")
+    # logging.warning(f"[DEBUG] Raw Gemini API response: {resp.text}")
     try:
         return resp.json(), resp.status_code
     except Exception as e:
@@ -104,7 +104,7 @@ async def chat_completions(request: Request, authorization: str = Header(None)):
     for key in gemini_keys:
         region = key["region"]
         model_name = key.get("model_name", model)
-        logging.warning(f"[DEBUG] Using model: {model_name} for region: {region}")
+        # logging.warning(f"[DEBUG] Using model: {model_name} for region: {region}")
         if can_send_request(region):
             try:
                 gemini_data, status_code = gemini_worker(gemini_payload, region, key["api_key"], model_name)
